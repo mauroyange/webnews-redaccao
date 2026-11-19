@@ -162,6 +162,37 @@ def pexels_original(foto_id):
     return _get(f"https://images.pexels.com/photos/{foto_id}/pexels-photo-{foto_id}.jpeg?w=2000").content
 
 
+def nappy_procurar(termo, maximo=12):
+    """Fotos do Nappy (licença CC0; pessoas negras e pardas) para um termo em inglês.
+    Devolve [{id, titulo, pagina}]. Só lê nappy.co; não descarrega nada."""
+    url = "https://nappy.co/search/" + urllib.parse.quote(termo.strip())
+    t = _get(url).text
+    vistos, fotos = set(), []
+    for titulo, fid in re.findall(r'<img[^>]+alt="([^"]*)"[^>]+images\.nappy\.co/photo/([A-Za-z0-9_-]+)\.', t):
+        if fid not in vistos:
+            vistos.add(fid)
+            fotos.append({"id": fid, "titulo": titulo, "pagina": f"https://nappy.co/photo/{fid}"})
+    return fotos[:maximo]
+
+
+def nappy_ficha(foto_id):
+    """Título, autor (@utilizador) e largura máxima disponível de uma foto do Nappy."""
+    t = _get(f"https://nappy.co/photo/{foto_id}").text
+    m = re.search(r"<title>(.*?)\s*\|", t, re.S)
+    titulo = (m.group(1).strip() if m else "").replace("&amp;", "&")
+    autor = re.search(r"@([A-Za-z0-9_.-]+)\s*$", titulo)
+    larguras = [int(w) for w in re.findall(re.escape(foto_id) + r"\.jpg\?width=(\d+)", t)]
+    return {"titulo": re.sub(r"\s*@[A-Za-z0-9_.-]+\s*$", "", titulo), "autor": autor.group(1) if autor else None,
+            "largura_max": max(larguras) if larguras else None, "licenca": "CC0 (Nappy)",
+            "pagina": f"https://nappy.co/photo/{foto_id}"}
+
+
+def nappy_original(foto_id, largura=1920):
+    """Bytes da foto em images.nappy.co. Esse domínio tem de estar autorizado nas definições do Claude;
+    se não estiver, o pedido falha (erro de proxy) e passa-se à fonte seguinte."""
+    return _get(f"https://images.nappy.co/photo/{foto_id}.jpg?width={largura}").content
+
+
 def enquadrar(conteudo, saida, foco=(0.5, 0.4), largura=1200, altura=675):
     """Corta a maior caixa 16:9 que contém o foco (fracções x, y da imagem) e põe o foco
     perto do terço superior; redimensiona e grava JPEG 85. Recusa imagens com menos de 1000 px."""
